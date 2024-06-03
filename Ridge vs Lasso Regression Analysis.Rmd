@@ -1,0 +1,300 @@
+---
+title: "Ridge vs Lasso Regression Models: Predicting College Graduation Rates"
+author: "David Heller"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+<br>
+
+### Introduction
+
+In this study, we delve into the realm of regularized regression techniques by comparing two popular methods: Ridge and Lasso regression. Both Ridge and Lasso regression are regularization techniques used in predictive modeling to mitigate overfitting and improve model generalization. However, they differ in their approaches to regularization and have distinct characteristics that influence their predictive performance.
+
+Ridge regression introduces a penalty term to the regression model that is proportional to the square of the coefficients. This penalty term, also known as the L2 norm, helps to shrink the coefficients towards zero, effectively reducing their magnitudes. On the other hand, Lasso regression utilizes a penalty term proportional to the absolute value of the coefficients, known as the L1 norm. This penalty induces sparsity in the coefficient matrix and performs feature selection by setting some coefficients to zero.
+
+The objective of this project is to explore and compare the predictive performance of Ridge and Lasso regression techniques in the context of predicting graduation rates for colleges. By leveraging the College dataset, which contains various attributes of colleges across the United States, we aim to gain insights into how these regularization techniques differ in their ability to model graduation rates. Through this comparative analysis, we seek to identify the strengths and limitations of Ridge and Lasso regression.
+
+<br>
+
+#### Libraries
+
+
+We will start by loading the necessary libraries for our analysis. These include 'ISLR' for accessing the 
+College dataset, 'glmnet' for fitting Ridge and Lasso regression models, and 'dplyr' for data manipulation.
+
+
+```{r message=FALSE, warning=FALSE}
+# Load necessary libraries
+library(ISLR)   # For accessing the College dataset
+library(glmnet) # For Ridge and Lasso regression
+library(dplyr)  # For data manipulation
+```
+
+<br>
+
+### Dataset
+
+
+Statistics for a large number of US Colleges from the 1995 issue of US News and World Report. The data frame has 777 observations and the following 18 variables:
+
+
+<ul>
+  <li>Private: A categorical variable indicating whether the college is private or not.</li>
+  <li>Apps: The number of applications received by the college.</li>
+  <li>Accept: The number of applicants accepted by the college.</li>
+  <li>Enroll: The number of students enrolled in the college.</li>
+  <li>Top10perc: The percentage of students in the top 10% of their high school graduating class.</li>
+  <li>Top25perc: The percentage of students in the top 25% of their high school graduating class.</li>
+  <li>F.Undergrad: The number of full-time undergraduates enrolled in the college.</li>
+  <li>P.Undergrad: The number of part-time undergraduates enrolled in the college.</li>
+  <li>Outstate: The out-of-state tuition fee.</li>
+  <li>Room.Board: The room and board costs.</li>
+  <li>Books: The estimated book costs.</li>
+  <li>Personal: The estimated personal spending allowance.</li>
+  <li>PhD: The percentage of faculty with Ph.D. degrees.</li>
+  <li>Terminal: The percentage of faculty with terminal degrees.</li>
+  <li>S.F.Ratio: The student-to-faculty ratio.</li>
+  <li>perc.alumni: The percentage of alumni who donate.</li>
+  <li>Expend: The instructional expenditure per student.</li>
+  <li>Grad.Rate: The graduation rate of the college (target variable).</li>
+</ul>
+
+Lets load the dataset and explore its structure, variables, and summary statistics.
+
+
+```{r}
+# Load the College dataset
+data(College)
+
+# Display the structure of the dataset
+str(College)
+
+# Display summary statistics of the dataset
+summary(College)
+```
+<br>
+
+### Data Preprocessing and Splitting 
+
+
+We split the dataset into training and testing sets, with 80% of the data used for training and the remaining 20% for testing.
+
+
+```{r}
+# Convert "Private" variable to numeric
+College$Private <- as.numeric(College$Private)  # Convert factor variable "Private" to numeric for modeling
+
+# Data Splitting
+set.seed(123)  # Set seed for reproducibility
+train_index <- sample(1:nrow(College), 0.8*nrow(College))  # Generate random indices for training set (80% of data)
+train_data <- College[train_index, ]  # Training set
+test_data <- College[-train_index, ]  # Test set
+```
+
+Now we are going to define predictor matrix and response vector:
+
+
+```{r}
+# Defining Predictor Matrix and Response Vector
+x_train <- as.matrix(train_data[, -which(names(train_data) == "Grad.Rate")])  # Predictor matrix for training set
+y_train <- train_data$Grad.Rate  # Target variable for training set
+x_test <- as.matrix(test_data[, -which(names(test_data) == "Grad.Rate")])  # Predictor matrix for test set
+y_test <- test_data$Grad.Rate  # Target variable for test set
+```
+
+<ul>
+  <li><strong>x_train:</strong> This variable represents the predictor matrix for the training set. We create this matrix by excluding the "Grad.Rate" column from the train_data dataframe using column indexing. The predictor matrix contains all the input features that will be used to predict the target variable.</li>
+  <li><strong>y_train:</strong> This variable represents the response vector for the training set. We extract the "Grad.Rate" column from the train_data dataframe and assign it to y_train. The response vector contains the target variable that the model aims to predict.</li>
+  <li><strong>x_test:</strong> This variable represents the predictor matrix for the test set. Similar to x_train, we exclude the "Grad.Rate" column from the test_data dataframe to create the predictor matrix for the test set.</li>
+  <li><strong>y_test:</strong> This variable represents the response vector for the test set. Similar to y_train, we extract the "Grad.Rate" column from the test_data dataframe and assign it to y_test.</li>
+</ul>
+
+<br>
+
+### Models Training
+
+
+The cv.glmnet function fits regression model using cross-validation and selects the optimal value of lambda (regularization parameter) that minimizes the mean squared error (MSE) on the training data. 
+
+
+```{r}
+# Fit Ridge Regression model
+ridge_model <- cv.glmnet(x_train, y_train, alpha = 0)  # Fit Ridge Regression model using glmnet package
+
+# Fit Lasso Regression model
+lasso_model <- cv.glmnet(x_train, y_train, alpha = 1)  # Fit Lasso Regression model using glmnet package
+```
+
+<br>
+
+### Models Evaluation
+
+
+```{r}
+# Using MSE to evaluate the models
+# Get Mean Squared Error (MSE) on test set for Ridge Regression
+ridge_predictions <- predict(ridge_model, s = "lambda.min", newx = x_test)  # Predictions using selected lambda
+ridge_mse <- mean((ridge_predictions - y_test)^2)  # Calculate Mean Squared Error
+
+# Get Mean Squared Error (MSE) on test set for Lasso Regression
+lasso_predictions <- predict(lasso_model, s = "lambda.min", newx = x_test)  # Predictions using selected lambda
+lasso_mse <- mean((lasso_predictions - y_test)^2)  # Calculate Mean Squared Error
+```
+
+##### Mean Squared Error
+
+```{r}
+# Print MSE for Ridge and Lasso Regression
+print(paste("Ridge Regression MSE:", ridge_mse))
+print(paste("Lasso Regression MSE:", lasso_mse))
+```
+The MSE values represent the average squared difference between the actual and predicted graduation rates for colleges in the test dataset. A lower MSE indicates better predictive performance, as it reflects smaller errors between the predicted and actual values. In this case, the Ridge regression model has a slightly lower MSE compared to the Lasso regression model. 
+
+
+##### Residual Analysis
+
+```{r}
+# Calculate residuals
+ridge_residuals <- ridge_predictions - y_test
+lasso_residuals <- lasso_predictions - y_test
+
+# Plot residuals vs predicted values
+par(mfrow = c(1, 2))
+plot(ridge_predictions, ridge_residuals, col = "blue", xlab = "Predicted Graduation Rates",
+     ylab = "Residuals", main = "Residual Analysis: Ridge")
+abline(h = 0, col = "red")
+plot(lasso_predictions, lasso_residuals, col = "green", xlab = "Predicted Graduation Rates",
+     ylab = "Residuals", main = "Residual Analysis: Lasso")
+abline(h = 0, col = "red")
+```
+
+
+
+<br>
+
+### Models Comparison
+
+
+```{r}
+# Extract selected coefficients for Ridge Regression
+ridge_coefficients <- coef(ridge_model, s = "lambda.min")  # Extract coefficients for selected lambda
+print("Ridge Regression Coefficients:")
+print(ridge_coefficients)
+```
+
+
+```{r}
+# Extract selected coefficients for Lasso Regression
+lasso_coefficients <- coef(lasso_model, s = "lambda.min")  # Extract coefficients for selected lambda
+print("Lasso Regression Coefficients:")
+print(lasso_coefficients)
+```
+Plotting top 5 coefficients:
+
+```{r}
+# Function to extract top n coefficients excluding intercept
+get_top_n_coefficients <- function(coefficients, n = 5) {
+  # Exclude intercept
+  coefficients <- coefficients[-1]
+  sorted_coefficients <- sort(abs(coefficients), decreasing = TRUE)
+  top_n <- sorted_coefficients[1:n]
+  top_n_names <- names(top_n)
+  return(top_n_names)
+}
+
+# Extracting top 5 coefficients for both models
+top_n_ridge <- get_top_n_coefficients(ridge_coefficients[, "s1"], n = 5)
+top_n_lasso <- get_top_n_coefficients(lasso_coefficients[, "s1"], n = 5)
+
+# Extracting corresponding coefficient values
+ridge_top5_values <- abs(ridge_coefficients[top_n_ridge, "s1"])
+lasso_top5_values <- abs(lasso_coefficients[top_n_lasso, "s1"])
+
+# Combining coefficients into a single df
+top5_coefficients_df <- data.frame(Ridge = ridge_top5_values, Lasso = lasso_top5_values)
+
+# Graphing top 5 feature importance
+barplot(t(top5_coefficients_df), beside = TRUE, col = c("blue", "red"), 
+        main = "Top 5 Feature Importance: Ridge vs Lasso",
+        xlab = "Features", ylab = "Absolute Coefficient Values",
+        legend.text = TRUE)
+legend("topright", legend = c("Ridge", "Lasso"), fill = c("blue", "red"))
+```
+
+
+Ridge and Lasso regression models, when applied to predict college graduation rates, highlight common influential factors with slight variations. Both emphasize the significance of private status, alumni involvement, and student academic performance. However, Ridge regression places a bit more weight on faculty credentials, particularly the percentage of faculty with Ph.D. degrees, whereas Lasso regression slightly favors other predictors. This nuanced difference suggests varying priorities in feature selection between the two techniques
+
+
+
+##### Coefficient Magnitudes:
+
+<ul>
+  <li><strong>Ridge Regression:</strong> Ridge regression tends to shrink coefficients towards zero while still keeping them non-zero. This is achieved through the L2 regularization penalty, which adds a fraction of the square of the coefficients to the loss function. In the provided coefficients, we observe that all features have non-zero coefficients, indicating that Ridge regression retains all features in the model.</li>
+  <li><strong>Lasso Regression:</strong> Lasso regression, on the other hand, can set some coefficients exactly to zero, leading to a sparse solution. This is achieved through the L1 regularization penalty, which adds the absolute value of the coefficients to the loss function. In the provided coefficients, we see that Lasso has set some coefficients (Accept, Enroll, and S.F.Ratio) to zero, indicating that these features are deemed less important for predicting graduation rates.</li>
+</ul>
+
+##### Interpretability:
+
+<ul>
+  <li><strong>Ridge Regression:</strong> While Ridge regression retains all features in the model, the coefficients are shrunk towards zero. This can make interpretation more challenging, especially when dealing with a large number of features, as the impact of each feature on the target variable may be less clear.</li>
+  <li><strong>Lasso Regression:</strong> Lasso regression’s ability to perform feature selection by setting some coefficients to zero can lead to more interpretable models. Features with non-zero coefficients are deemed more important for predicting graduation rates, while features with zero coefficients are considered less relevant and can be ignored.</li>
+</ul>
+
+##### Model Complexity:
+
+<ul>
+  <li><strong>Ridge Regression:</strong> Ridge regression typically results in models with all features included, albeit with their coefficients shrunk towards zero. This can lead to more complex models, especially when dealing with datasets with a large number of features.</li>
+  <li><strong>Lasso Regression:</strong> Lasso regression tends to produce sparser models with fewer features, as it sets some coefficients exactly to zero. This can lead to simpler models with reduced complexity, which may be desirable for better interpretability and computational efficiency.</li>
+</ul>
+
+##### Performance:
+
+<ul>
+  <li><strong>Ridge Regression:</strong> In this case, Ridge regression has a slightly lower MSE compared to Lasso regression, indicating slightly better predictive performance. However, the difference in MSE between the two models is relatively small. Further analysis, such as cross-validation or testing on additional datasets, may be needed to determine if this difference is statistically significant and consistent across different datasets.</li>
+</ul>
+<br>
+
+### Conclusions
+
+In summary, Ridge and Lasso regression each offer unique strengths and limitations that cater to different analytical needs:
+
+#### Ridge Regression:
+**Strengths:**
+<ul>
+  <li>Retains all features in the model, providing a comprehensive view of the data.</li>
+  <li>Performs well when multicollinearity is present among predictor variables.</li>
+  <li>Suitable for scenarios where interpretability is not the primary concern, and the focus is on predictive accuracy.</li>
+</ul>
+
+**Limitations:**
+<ul>
+  <li>Does not perform feature selection; all features are retained in the model.</li>
+  <li>May struggle with datasets containing a large number of irrelevant features, leading to less interpretable models.</li>
+</ul>
+
+**Optimal Usage:**
+Ridge regression is preferred when predictive accuracy is paramount, and the goal is to prevent overfitting in the presence of multicollinearity. It is also suitable when interpretability is less critical, and a comprehensive model view is desired.
+
+#### Lasso Regression:
+
+**Strengths:**
+<ul>
+  <li>Performs feature selection by setting some coefficients to zero, resulting in simpler and more interpretable models.</li>
+  <li>Well-suited for scenarios where identifying the most relevant features is essential for decision-making.</li>
+  <li>Can handle datasets with a large number of predictors by effectively reducing model complexity.</li>
+</ul>
+
+**Limitations:**
+<ul>
+  <li>May struggle when predictors are highly correlated, as it tends to arbitrarily select one predictor over others.</li>
+  <li>Less effective in situations where all features are potentially relevant, as it may discard useful predictors.</li>
+</ul>
+
+**Optimal Usage:**
+Lasso regression is preferred when interpretability and feature selection are crucial, and there is a need to identify the most influential predictors. It is particularly useful when dealing with high-dimensional datasets or when model simplicity is desired.
+
+In practice, the choice between Ridge and Lasso regression depends on the specific goals of the analysis, including the trade-offs between predictive accuracy, interpretability, and model complexity.
